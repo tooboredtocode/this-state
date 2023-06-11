@@ -1,0 +1,21 @@
+[package]
+name = "this-state"
+version = "0.1.0"
+edition = "2021"
+authors = ["tooboredtocode"]
+license = "ISC"
+description = "this-state provides a way to store state in a thread-safe manner as well as a way to asynchronously wait for state changes"
+repository = "https://github.com/tooboredtocode/this-state"
+keywords = ["state", "async"]
+readme = "README.md"
+documentation = "https://docs.rs/this-state"
+homepage = "https://github.com/tooboredtocode/this-state"
+exclude = [".github/*"]
+rust-version = "1.56.1"
+
+[dependencies]
+parking_lot = "0.12"
+
+[dev-dependencies]
+# This is needed so we can test the futures used in the async tests.
+tokio = { version = "1.13", features = ["full"] }
