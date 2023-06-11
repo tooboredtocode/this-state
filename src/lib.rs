@@ -232,6 +232,12 @@ impl<S: fmt::Debug> fmt::Debug for State<S> {
     }
 }
 
+impl<S: Default> Default for State<S> {
+    fn default() -> Self {
+        Self::new(Default::default())
+    }
+}
+
 impl Waiter {
     fn new() -> Waiter {
         Waiter {
