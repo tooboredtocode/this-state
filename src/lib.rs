@@ -82,7 +82,7 @@ struct StateInner<S> {
     /// The wait queue, containing all tasks waiting for a state change.
     waiters: RwLock<LinkedList<Waiter, <Waiter as linked_list::Link>::Target>>,
     /// Callback that is called when the state changes.
-    on_change: Box<dyn Fn(&S) + 'static>,
+    on_change: Box<dyn Fn(&S, &S) + 'static>,
 }
 
 /// An entry in the wait queue.
@@ -130,13 +130,14 @@ impl<S> State<S> {
             inner: Arc::new(StateInner {
                 state: RwLock::new(state),
                 waiters: RwLock::new(LinkedList::new()),
-                on_change: Box::new(|_| {}),
+                on_change: Box::new(|_, _| {}),
             }),
         }
     }
 
     /// Creates a new state with the given `on_change` callback.
-    pub fn new_with_on_change(state: S, on_change: impl Fn(&S) + 'static) -> Self {
+    ///
+    pub fn new_with_on_change(state: S, on_change: impl Fn(&S, &S) + 'static) -> Self {
         Self {
             inner: Arc::new(StateInner {
                 state: RwLock::new(state),
@@ -168,7 +169,7 @@ impl<S> State<S> {
     /// Sets the state to the given value.
     pub fn set(&self, state: S) {
         let mut write = self.inner.state.write();
-        (self.inner.on_change)(&state);
+        (self.inner.on_change)(&*write, &state);
         *write = state;
         drop(write);
         self.wake_waiters();
