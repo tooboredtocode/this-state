@@ -137,6 +137,9 @@ impl<S> State<S> {
 
     /// Creates a new state with the given `on_change` callback.
     ///
+    /// # Notes
+    /// The callback is not called when the state is set for the first time, as well as on
+    /// the `State::update` method. You must call the callback manually in these cases.
     pub fn new_with_on_change(state: S, on_change: impl Fn(&S, &S) + 'static) -> Self {
         Self {
             inner: Arc::new(StateInner {
@@ -171,6 +174,18 @@ impl<S> State<S> {
         let mut write = self.inner.state.write();
         (self.inner.on_change)(&*write, &state);
         *write = state;
+        drop(write);
+        self.wake_waiters();
+    }
+
+    /// Updates the state using the given function.
+    /// This avoids having to create a new state value, which can be useful for large state values.
+    ///
+    /// # Notes
+    /// This *DOES NOT* call the `on_change` callback, as it is not possible to get the old state.
+    pub fn update(&self, f: impl FnOnce(&mut S)) {
+        let mut write = self.inner.state.write();
+        f(&mut write);
         drop(write);
         self.wake_waiters();
     }
