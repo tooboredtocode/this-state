@@ -271,18 +271,7 @@ unsafe impl linked_list::Link for Waiter {
     }
 }
 
-impl<S, C> StateFuture<S, C>
-where
-    C: Fn(&S) -> bool,
-{
-    fn new(state: State<S>, wait_for: C) -> Self {
-        Self {
-            state,
-            waiter: UnsafeCell::new(Waiter::new()),
-            wait_for,
-        }
-    }
-
+impl<S, C> StateFuture<S, C> {
     /// Returns a reference to the current state.
     ///
     /// This may be useful to create other futures or simply getting the current state.
@@ -320,7 +309,7 @@ where
         }
     }
 
-    fn remove_waiter(self: Pin<&mut Self>) {
+    fn remove_waiter(&self) {
         let mut waiters = self.state.inner.waiters.write();
 
         let waiter = unsafe { &mut *self.waiter.get() };
@@ -337,6 +326,19 @@ where
         }
 
         drop(waiters);
+    }
+}
+
+impl<S, C> StateFuture<S, C>
+where
+    C: Fn(&S) -> bool,
+{
+    fn new(state: State<S>, wait_for: C) -> Self {
+        Self {
+            state,
+            waiter: UnsafeCell::new(Waiter::new()),
+            wait_for,
+        }
     }
 }
 
@@ -358,6 +360,13 @@ where
 
         self.queue_waker(cx.waker());
         Poll::Pending
+    }
+}
+
+impl<S, C> Drop for StateFuture<S, C> {
+    fn drop(&mut self) {
+        // remove the waiter from the list, since we're done waiting.
+        self.remove_waiter();
     }
 }
 
