@@ -6,7 +6,7 @@ as well as a way to asynchronously wait for state changes.
 # Examples
 The example below uses the following state:
 
-````rs
+````rust
 #[derive(Clone, Debug, PartialEq)]
 enum MyState {
     A,
@@ -17,7 +17,7 @@ enum MyState {
 
 ## Waiting for a state change
 
-````rs
+````rust
 let state = State::new(MyState::A);
 
 let state_clone = state.clone();
