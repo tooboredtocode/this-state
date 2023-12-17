@@ -326,13 +326,19 @@ impl<S, C> StateFuture<S, C> {
     }
 
     fn remove_waiter(&self) {
-        let mut waiters = self.state.inner.waiters.write();
+        let waiters = self.state.inner.waiters.read();
 
         let waiter = unsafe { &mut *self.waiter.get() };
         if !waiter.queued {
             // Return since the waiter is not queued.
             return;
         }
+
+        drop(waiters);
+        let mut waiters = self.state.inner.waiters.write();
+
+        // We don't have to check if the waiter was dropped in the meantime, since only the future
+        // itself removes the waiter from the list.
 
         unsafe {
             // Safety: waiter is not null and !Unpin.
