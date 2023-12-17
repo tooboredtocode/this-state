@@ -49,6 +49,7 @@
 //! ```
 
 use std::cell::UnsafeCell;
+use std::error::Error;
 use std::fmt;
 use std::future::Future;
 use std::marker::PhantomPinned;
@@ -83,6 +84,17 @@ struct StateInner<S> {
     waiters: RwLock<LinkedList<Waiter, <Waiter as linked_list::Link>::Target>>,
     /// Callback that is called when the state changes.
     on_change: Box<dyn Fn(&S, &S) + 'static>,
+}
+
+/// Error returned by `State::set_on_change` if there are multiple references to the state.
+pub struct UpdateOnChangeError {
+    /// Number of references to the state.
+    ///
+    /// # Notes
+    /// This number is only accurate if the state has not been cloned in another thread.
+    pub state_references: usize,
+    /// Private field to prevent construction outside of this crate.
+    _p: (),
 }
 
 /// An entry in the wait queue.
@@ -148,6 +160,26 @@ impl<S> State<S> {
                 on_change: Box::new(on_change),
             }),
         }
+    }
+
+    /// Tries to set the `on_change` callback, to the new callback.
+    ///
+    /// # Notes
+    /// The callback is not called when the state is set for the first time, as well as on
+    /// the `State::update` method. You must call the callback manually in these cases.
+    pub fn set_on_change(&mut self, on_change: impl Fn(&S, &S) + 'static) -> Result<(), UpdateOnChangeError> {
+        if let Some(inner) = Arc::get_mut(&mut self.inner) {
+            inner.on_change = Box::new(on_change);
+            Ok(())
+        } else {
+            Err(UpdateOnChangeError::new(self.ref_count()))
+        }
+    }
+
+    /// Returns the number of references to the state.
+    /// This can be used to check if there are any other references to the state.
+    pub fn ref_count(&self) -> usize {
+        Arc::strong_count(&self.inner)
     }
 
     /// Returns a reference to the current state.
@@ -248,6 +280,32 @@ impl<S: Default> Default for State<S> {
         Self::new(Default::default())
     }
 }
+
+impl UpdateOnChangeError {
+    /// Private constructor.
+    fn new(state_references: usize) -> Self {
+        Self {
+            state_references,
+            _p: (),
+        }
+    }
+}
+
+impl fmt::Debug for UpdateOnChangeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("UpdateOnChangeError")
+            .field("state_references", &self.state_references)
+            .finish()
+    }
+}
+
+impl fmt::Display for UpdateOnChangeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Cannot update state, as there are {} other references to the state.", self.state_references)
+    }
+}
+
+impl Error for UpdateOnChangeError {}
 
 impl Waiter {
     fn new() -> Waiter {
