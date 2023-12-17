@@ -224,12 +224,7 @@ where
 {
     /// Returns a future that resolves when the state is equal to the given value.
     pub fn wait_for_state(&self, wait_for: S) -> StateFuture<S, impl Fn(&S) -> bool> {
-        StateFuture::new(
-            State {
-                inner: self.inner.clone(),
-            },
-            move |s| wait_for.eq(s),
-        )
+        self.wait_for(move |s| wait_for.eq(s))
     }
 }
 
